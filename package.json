@@ -1,0 +1,90 @@
+{
+  "name": "hixs-shares",
+  "productName": "HixsSharesV5",
+  "version": "1.0.0",
+  "description": "Lightning-fast P2P file transfers across platforms",
+  "main": "main.js",
+  "author": {
+    "name": "Geethudinoyt",
+    "email": "contact@hixshares.com"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win nsis",
+    "dist:store": "electron-builder --win appx",
+    "package": "electron-packager . \"HixsSharesV5\" --platform=win32 --arch=x64 --icon=logo.png --out=dist --overwrite --asar",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "electron-log": "^5.1.0",
+    "electron-updater": "^6.1.7"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "electron-packager": "^17.1.2",
+    "png-to-ico": "^3.0.1"
+  },
+  "build": {
+    "appId": "com.hixshares.app",
+    "productName": "HixsSharesV5",
+    "copyright": "Copyright © 2026 Geethudinoyt",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "logo.png",
+      "publisherName": "CN=Geethudinoyt",
+      "sign": null
+    },
+    "appx": {
+      "applicationId": "HixsShares",
+      "displayName": "Hixs Shares",
+      "publisherDisplayName": "Geethudinoyt",
+      "publisher": "CN=Geethudinoyt",
+      "identityName": "Geethudinoyt.HixsShares",
+      "backgroundColor": "#050508",
+      "showNameOnTiles": true,
+      "languages": [
+        "en-US"
+      ],
+      "addAutoLaunchExtension": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HixsSharesV5",
+      "artifactName": "hixsharesv5.exe"
+    },
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "config.js",
+      "logo.png",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    }
+  }
+}

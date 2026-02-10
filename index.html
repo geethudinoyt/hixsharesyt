@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a0f">
+    <title>hixs shares | P2P File Transfer</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="config.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg-primary: #050508;
+            --bg-secondary: #0f0f13;
+            --bg-glass: rgba(20, 20, 25, 0.8);
+            --accent: #00d4ff;
+            --accent-secondary: #ff006e;
+            --success: #00f5d4;
+            --warning: #fee440;
+            --error: #f15bb5;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b0;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #050508 0%, #0a0a12 50%, #080810 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        /* Animated Background */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glow-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glow-orb:nth-child(1) {
+            width: 400px;
+            height: 400px;
+            background: var(--accent);
+            top: -200px;
+            right: -200px;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .glow-orb:nth-child(2) {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-secondary);
+            bottom: -150px;
+            left: -150px;
+            animation: float 25s infinite ease-in-out reverse;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            33% {
+                transform: translate(30px, -30px) scale(1.1);
+            }
+
+            66% {
+                transform: translate(-20px, 20px) scale(0.9);
+            }
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 2rem 0 1.5rem;
+        }
+
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -1px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        /* Mode Selector */
+        .mode-selector {
+            display: flex;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 0.4rem;
+            margin: 1.5rem auto;
+            max-width: 400px;
+            backdrop-filter: blur(20px);
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 0.9rem 1rem;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(255, 0, 110, 0.1));
+            color: var(--text-primary);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.2);
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 1.5rem;
+            backdrop-filter: blur(20px);
+            margin-bottom: 1rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (max-width: 640px) {
+            .card {
+                padding: 1.25rem;
+                border-radius: 20px;
+            }
+
+            .logo {
+                font-size: 2rem;
+            }
+        }
+
+        /* Connection Panel */
+        .connection-panel {
+            text-align: center;
+        }
+
+        .peer-id-display {
+            font-family: 'Courier New', monospace;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+            background: rgba(0, 212, 255, 0.1);
+            padding: 1rem;
+            border-radius: 16px;
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            display: inline-block;
+            margin: 1rem 0;
+            letter-spacing: 4px;
+            cursor: pointer;
+            position: relative;
+            user-select: all;
+            transition: all 0.3s;
+            word-break: break-all;
+            max-width: 100%;
+        }
+
+        @media (max-width: 640px) {
+            .peer-id-display {
+                font-size: 1.5rem;
+                letter-spacing: 2px;
+                width: 100%;
+            }
+        }
+
+        .peer-id-display:active {
+            transform: scale(0.98);
+            background: rgba(0, 212, 255, 0.2);
+        }
+
+        .qr-container {
+            margin: 1.5rem auto;
+            padding: 1rem;
+            background: white;
+            border-radius: 16px;
+            display: inline-block;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Input Groups */
+        .input-group {
+            display: flex;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        @media (max-width: 640px) {
+            .input-group {
+                flex-direction: column;
+            }
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 1rem 1.25rem;
+            border: 2px solid var(--border);
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            touch-action: manipulation;
+        }
+
+        @media (max-width: 640px) {
+            .btn {
+                width: 100%;
+                padding: 1.1rem;
+            }
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            color: white;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:active {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+            background: rgba(255, 255, 255, 0.02);
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 640px) {
+            .drop-zone {
+                padding: 2.5rem 1.5rem;
+            }
+        }
+
+        .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(0, 212, 255, 0.05);
+            transform: scale(1.02);
+        }
+
+        .drop-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+
+        .drop-text {
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .drop-subtext {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* File List */
+        .file-list {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .file-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            animation: slideIn 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .file-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        @media (max-width: 640px) {
+            .file-header {
+                flex-wrap: wrap;
+            }
+        }
+
+        .file-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.95rem;
+        }
+
+        .file-size {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .file-status {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.1);
+            white-space: nowrap;
+        }
+
+        .file-status.ready {
+            background: rgba(0, 245, 212, 0.15);
+            color: var(--success);
+        }
+
+        .file-status.transferring {
+            background: rgba(254, 228, 64, 0.15);
+            color: var(--warning);
+        }
+
+        .file-status.error {
+            background: rgba(241, 91, 181, 0.15);
+            color: var(--error);
+        }
+
+        .file-status.completed {
+            background: rgba(0, 212, 255, 0.15);
+            color: var(--accent);
+        }
+
+        /* Real-time Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent);
+            font-family: 'Courier New', monospace;
+        }
+
+        .stat-value.speed {
+            color: var(--success);
+        }
+
+        .stat-value.eta {
+            color: var(--warning);
+        }
+
+        /* Progress Section */
+        .progress-section {
+            margin-top: 0.5rem;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-secondary));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* Real-time Graph */
+        .speed-graph {
+            height: 60px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            margin-top: 1rem;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .speed-graph canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Status Indicator */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin: 1rem 0;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-indicator.connecting {
+            background: rgba(254, 228, 64, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(254, 228, 64, 0.3);
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: rgba(0, 245, 212, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(0, 245, 212, 0.3);
+        }
+
+        .status-indicator.error {
+            background: rgba(241, 91, 181, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(241, 91, 181, 0.3);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Activity Log */
+        .activity-log {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--accent);
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 1rem 1.5rem;
+            background: var(--bg-glass);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s;
+            max-width: 90vw;
+            width: max-content;
+            text-align: center;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--error);
+        }
+
+        .toast.info {
+            border-left: 4px solid var(--accent);
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Touch improvements */
+        @media (hover: none) {
+            .btn:hover {
+                transform: none;
+            }
+
+            .btn:active {
+                transform: scale(0.98);
+            }
+        }
+
+        /* Utility */
+        .text-center {
+            text-align: center;
+        }
+
+        .mb-2 {
+            margin-bottom: 1rem;
+        }
+
+        .mt-2 {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-grid"></div>
+    <div class="glow-orb"></div>
+    <div class="glow-orb"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo">⚡ hixs shares</div>
+            <div class="tagline">Lightning-fast P2P file transfers</div>
+        </header>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('send')">
+                <span>📤</span> Send
+            </button>
+            <button class="mode-btn" onclick="switchMode('receive')">
+                <span>📥</span> Receive
+            </button>
+        </div>
+
+        <!-- Send Mode -->
+        <div id="sendMode" class="card">
+            <div id="senderInitial" class="connection-panel">
+                <h2 class="mb-2">Start Sharing</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">
+                    Create a secure room to share files directly with anyone
+                </p>
+                <button class="btn btn-primary" onclick="initializeSender()" id="startBtn" style="min-width: 200px;">
+                    <span>Create Share Room</span>
+                </button>
+            </div>
+
+            <div id="senderActive" class="hidden">
+                <div class="text-center">
+                    <div class="status-indicator connecting" id="senderStatus">
+                        <span class="spinner"></span>
+                        <span>Initializing...</span>
+                    </div>
+                </div>
+
+                <div class="text-center" style="margin: 1.5rem 0;">
+                    <div
+                        style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px;">
+                        Your Share Code
+                    </div>
+                    <div class="peer-id-display" id="peerIdDisplay" onclick="copyCode()">---</div>
+                    <button class="btn btn-secondary" onclick="copyCode()"
+                        style="margin-top: 0.5rem; padding: 0.6rem 1.2rem;">
+                        📋 Copy Code
+                    </button>
+                    <div style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;">
+                        Tap code to copy • Share this code or scan QR
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <div class="qr-container" id="qrcode"></div>
+                </div>
+
+                <div
+                    style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 1rem; margin-top: 1.5rem; border: 1px solid var(--border);">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" id="shareLink" class="input-field" readonly
+                            style="font-size: 0.8rem; text-transform: none;">
+                        <button class="btn btn-secondary" onclick="copyLink()" style="padding: 0.8rem;">
+                            Copy Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Transfer Stats Summary -->
+                <div id="transferStats" class="hidden"
+                    style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,245,212,0.05); border-radius: 12px; border: 1px solid rgba(0,245,212,0.2);">
+                    <div style="font-size: 0.85rem; color: var(--success); margin-bottom: 0.5rem; font-weight: 600;">📊
+                        Transfer Statistics</div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.8rem;">
+                        <div><span style="color: var(--text-secondary);">Files Sent:</span> <span id="filesSent"
+                                style="color: var(--text-primary); font-weight: 600;">0</span></div>
+                        <div><span style="color: var(--text-secondary);">Total Size:</span> <span id="totalSent"
+                                style="color: var(--text-primary); font-weight: 600;">0 B</span></div>
+                    </div>
+                </div>
+
+                <!-- Transfer History -->
+                <div id="transferHistory" class="hidden"
+                    style="margin-top: 1rem; padding: 1rem; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border);">
+                    <div
+                        style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Recent History</div>
+                    <div id="historyList"
+                        style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto;">
+                        <!-- History items added here -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="dropZoneContainer" class="hidden">
+                <div class="drop-zone" id="dropZone" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)"
+                    ondragleave="dragLeaveHandler(event)" onclick="document.getElementById('fileInput').click()">
+                    <div class="drop-icon">📁</div>
+                    <div class="drop-text">Drop files here</div>
+                    <div class="drop-subtext">or click to browse • Any file type • No size limits</div>
+                    <input type="file" id="fileInput" multiple onchange="fileSelectHandler(event)">
+                </div>
+
+                <div id="fileList" class="file-list"></div>
+
+                <div id="sendLog" class="activity-log hidden"></div>
+            </div>
+        </div>
+
+        <!-- Receive Mode -->
+        <div id="receiveMode" class="card hidden">
+            <div class="connection-panel">
+                <h2 class="mb-2">Receive Files</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.95rem;">
+                    Enter the 6-character code from the sender
+                </p>
+
+                <div class="input-group">
+                    <input type="text" id="connectId" class="input-field" placeholder="ABC123" maxlength="6">
+                    <button class="btn btn-primary" onclick="connectToPeer()" id="connectBtn">
+                        <span>Connect</span>
+                    </button>
+                </div>
+
+                <div id="receiveStatus" class="text-center hidden">
+                    <div class="status-indicator connecting" id="receiveStatusText">
+                        <span class="spinner"></span>
+                        <span>Connecting...</span>
+                    </div>
+                </div>
+
+                <div id="incomingFiles" class="file-list hidden"></div>
+
+                <div id="receiveLog" class="activity-log hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Global State
+        let peer = null;
+        let connection = null;
+        let filesQueue = [];
+        let activeTransfers = new Map();
+        let receivedBuffers = new Map();
+        let speedHistory = [];
+        let currentMode = 'send';
+        let chunkSize = 16384; // 16KB chunks for reliability
+        let maxRetries = 3;
+
+        // Stats tracking
+        let statsInterval = null;
+        let startTime = null;
+        let lastBytes = 0;
+        let currentSpeed = 0;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('room');
+            if (roomId) {
+                switchMode('receive');
+                document.getElementById('connectId').value = roomId.toUpperCase();
+            }
+
+            // Electron API integration
+            if (window.electronAPI) {
+                // Listen for tray menu actions
+                window.electronAPI.onSwitchMode((mode) => {
+                    switchMode(mode);
+                });
+
+                // Listen for deep link room joins
+                window.electronAPI.onJoinRoom((code) => {
+                    switchMode('receive');
+                    document.getElementById('connectId').value = code.toUpperCase();
+                    connectToPeer();
+                });
+
+                // Listen for updates
+                window.electronAPI.onUpdateAvailable(() => {
+                    showToast('New update available! Will install on restart.', 'info');
+                });
+
+                // Override showToast for Electron notifications
+                const originalShowToast = showToast;
+                showToast = function (message, type = 'info') {
+                    originalShowToast(message, type);
+                    if (type === 'success' || type === 'error') {
+                        window.electronAPI.showNotification({
+                            title: 'Hixs Shares',
+                            body: message
+                        });
+                    }
+                };
+            }
+        });
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach((btn, idx) => {
+                btn.classList.toggle('active',
+                    (mode === 'send' && idx === 0) || (mode === 'receive' && idx === 1)
+                );
+            });
+
+            document.getElementById('sendMode').classList.toggle('hidden', mode !== 'send');
+            document.getElementById('receiveMode').classList.toggle('hidden', mode !== 'receive');
+        }
+
+        function generateId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function initializeSender() {
+            const btn = document.getElementById('startBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>';
+
+            const peerId = generateId();
+
+            peer = new Peer(peerId, {
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                debug: 0,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' }
+                    ],
+                    iceCandidatePoolSize: 10
+                }
+            });
+
+            peer.on('open', (id) => {
+                document.getElementById('senderInitial').classList.add('hidden');
+                document.getElementById('senderActive').classList.remove('hidden');
+                document.getElementById('dropZoneContainer').classList.remove('hidden');
+                document.getElementById('sendLog').classList.remove('hidden');
+
+                document.getElementById('peerIdDisplay').textContent = id;
+
+                // Base URL for sharing (always Cloudflare Workers)
+                const baseUrl = 'https://hixshares.pgboyahpgr.workers.dev/';
+
+                // Generate QR and share link
+                const shareUrl = `${baseUrl}?room=${id}`;
+
+                document.getElementById('qrcode').innerHTML = '';
+                new QRCode(document.getElementById('qrcode'), {
+                    text: shareUrl,
+                    width: 128,
+                    height: 128,
+                    colorDark: '#000',
+                    colorLight: '#fff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                document.getElementById('shareLink').value = shareUrl;
+
+                updateStatus('senderStatus', 'connected', 'Ready • Waiting for receiver...');
+                log('sendLog', 'Room created. Share code to begin.', 'info');
+            });
+
+            peer.on('connection', (conn) => {
+                handleConnection(conn, 'sender');
+            });
+
+            peer.on('error', (err) => {
+                showToast('Connection error: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span>Retry</span>';
+            });
+
+            peer.on('disconnected', () => {
+                peer.reconnect();
+            });
+        }
+
+        function connectToPeer() {
+            const code = document.getElementById('connectId').value.trim().toUpperCase();
+            if (!code || code.length !== 6) {
+                showToast('Please enter a valid 6-character code', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('connectBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>';
+            document.getElementById('receiveStatus').classList.remove('hidden');
+
+            peer = new Peer({
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                debug: 0,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' }
+                    ],
+                    iceCandidatePoolSize: 10
+                }
+            });
+
+            peer.on('open', () => {
+                const conn = peer.connect(code, {
+                    reliable: true,
+                    serialization: 'binary',
+                    metadata: { type: 'file-transfer' }
+                });
+                handleConnection(conn, 'receiver');
+            });
+
+            peer.on('error', (err) => {
+                showToast('Failed to connect: ' + err.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span>Connect</span>';
+                updateStatus('receiveStatusText', 'error', 'Connection failed');
+            });
+        }
+
+        function handleConnection(conn, role) {
+            connection = conn;
+
+            conn.on('open', () => {
+                if (role === 'sender') {
+                    updateStatus('senderStatus', 'connected', 'Receiver connected • Ready to send');
+                    log('sendLog', 'Receiver connected!', 'success');
+
+                    // Send any queued files
+                    if (filesQueue.length > 0) {
+                        filesQueue.forEach(file => sendFile(file));
+                    }
+                } else {
+                    updateStatus('receiveStatusText', 'connected', 'Connected • Waiting for files...');
+                    document.getElementById('incomingFiles').classList.remove('hidden');
+                    document.getElementById('receiveLog').classList.remove('hidden');
+                    document.getElementById('connectBtn').innerHTML = '<span>Connected</span>';
+                    log('receiveLog', 'Connected to sender', 'success');
+                    showToast('Connected successfully!', 'success');
+                }
+
+                startStatsTracking();
+            });
+
+            conn.on('data', (data) => {
+                if (role === 'receiver') {
+                    handleReceiveData(data);
+                } else {
+                    handleSenderAck(data);
+                }
+            });
+
+            conn.on('close', () => {
+                const msg = role === 'sender' ? 'Receiver disconnected' : 'Sender disconnected';
+                showToast(msg, 'error');
+                updateStatus(role === 'sender' ? 'senderStatus' : 'receiveStatusText', 'error', msg);
+                stopStatsTracking();
+            });
+
+            conn.on('error', (err) => {
+                showToast('Transfer error: ' + err.message, 'error');
+                log(role === 'sender' ? 'sendLog' : 'receiveLog', 'Error: ' + err.message, 'error');
+            });
+        }
+
+        // File Handling
+        function dragOverHandler(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function dragLeaveHandler(e) {
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function dropHandler(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            handleFiles(Array.from(e.dataTransfer.files));
+        }
+
+        function fileSelectHandler(e) {
+            handleFiles(Array.from(e.target.files));
+        }
+
+        function handleFiles(files) {
+            files.forEach(file => {
+                const id = Math.random().toString(36).substr(2, 9);
+                filesQueue.push({ file, id, status: 'queued' });
+                renderFileItem(file, id, 'send');
+            });
+
+            if (connection && connection.open) {
+                filesQueue.filter(f => f.status === 'queued').forEach(f => {
+                    f.status = 'sending';
+                    sendFile(f);
+                });
+            } else {
+                showToast(`${files.length} file(s) ready to send`, 'info');
+            }
+        }
+
+        function renderFileItem(file, id, mode, metadata = null) {
+            const list = document.getElementById(mode === 'send' ? 'fileList' : 'incomingFiles');
+            const size = metadata ? metadata.size : file.size;
+            const name = metadata ? metadata.name : file.name;
+            const type = metadata ? metadata.mimeType : file.type;
+
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            div.id = `file-${id}`;
+            div.innerHTML = `
+                <div class="file-header">
+                    <div class="file-icon">${getFileIcon(type)}</div>
+                    <div class="file-info">
+                        <div class="file-name">${escapeHtml(name)}</div>
+                        <div class="file-size">${formatBytes(size)}</div>
+                    </div>
+                    <div class="file-status ready" id="status-${id}">Ready</div>
+                </div>
+                
+                <div class="progress-section">
+                    <div class="progress-header">
+                        <span id="progress-text-${id}">0%</span>
+                        <span id="progress-detail-${id}" style="color: var(--text-secondary); font-size: 0.8rem;">Waiting...</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-${id}" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="stats-${id}" style="display: none;">
+                    <div class="stat-box">
+                        <div class="stat-label">Speed</div>
+                        <div class="stat-value speed" id="speed-${id}">0 MB/s</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">ETA</div>
+                        <div class="stat-value eta" id="eta-${id}">--:--</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">Transferred</div>
+                        <div class="stat-value" id="transferred-${id}">0 / ${formatBytes(size)}</div>
+                    </div>
+                </div>
+
+                <div class="speed-graph hidden" id="graph-${id}">
+                    <canvas id="canvas-${id}"></canvas>
+                </div>
+            `;
+            list.appendChild(div);
+        }
+
+        async function sendFile(fileObj) {
+            const { file, id } = fileObj;
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            let currentChunk = 0;
+            let transferred = 0;
+            let retries = 0;
+
+            activeTransfers.set(id, {
+                startTime: Date.now(),
+                lastUpdate: Date.now(),
+                bytesTransferred: 0,
+                totalBytes: file.size,
+                speedHistory: [],
+                chunksSent: new Set()
+            });
+
+            // Show stats
+            document.getElementById(`stats-${id}`).style.display = 'grid';
+            document.getElementById(`status-${id}`).className = 'file-status transferring';
+            document.getElementById(`status-${id}`).textContent = 'Sending';
+
+            // Send metadata
+            connection.send({
+                type: 'metadata',
+                id: id,
+                name: file.name,
+                size: file.size,
+                mimeType: file.type,
+                totalChunks: totalChunks
+            });
+
+            // Send chunks with flow control
+            for (let offset = 0; offset < file.size; offset += chunkSize) {
+                if (!connection.open) {
+                    log('sendLog', `Transfer paused: ${file.name}`, 'error');
+                    return;
+                }
+
+                const chunk = file.slice(offset, offset + chunkSize);
+                const buffer = await chunk.arrayBuffer();
+                const chunkIndex = currentChunk;
+
+                // Retry logic
+                let sent = false;
+                let attempts = 0;
+
+                while (!sent && attempts < maxRetries) {
+                    try {
+                        connection.send({
+                            type: 'chunk',
+                            id: id,
+                            index: chunkIndex,
+                            data: buffer,
+                            total: totalChunks
+                        });
+
+                        activeTransfers.get(id).chunksSent.add(chunkIndex);
+                        sent = true;
+                    } catch (e) {
+                        attempts++;
+                        if (attempts >= maxRetries) {
+                            log('sendLog', `Failed to send chunk ${chunkIndex} after ${maxRetries} attempts`, 'error');
+                            break;
+                        }
+                        await new Promise(r => setTimeout(r, 100 * attempts));
+                    }
+                }
+
+                currentChunk++;
+                transferred += buffer.byteLength;
+
+                // Update progress
+                const progress = (currentChunk / totalChunks) * 100;
+                updateProgressUI(id, progress, transferred, file.size);
+
+                // Flow control - prevent overwhelming the buffer
+                if (currentChunk % 5 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+            }
+
+            // Send completion
+            connection.send({
+                type: 'complete',
+                id: id
+            });
+
+            document.getElementById(`status-${id}`).className = 'file-status completed';
+            document.getElementById(`status-${id}`).textContent = 'Sent ✓';
+            document.getElementById(`progress-detail-${id}`).textContent = 'Complete';
+
+            log('sendLog', `Sent: ${file.name} (${formatBytes(file.size)})`, 'success');
+
+            // Update transfer statistics
+            updateTransferStats(file.size, file.name);
+
+            activeTransfers.delete(id);
+        }
+
+        function handleReceiveData(data) {
+            if (data.type === 'metadata') {
+                receivedBuffers.set(data.id, {
+                    metadata: data,
+                    chunks: new Array(data.totalChunks),
+                    receivedCount: 0,
+                    startTime: Date.now(),
+                    bytesReceived: 0,
+                    speedHistory: []
+                });
+
+                renderFileItem(null, data.id, 'receive', data);
+                document.getElementById(`stats-${data.id}`).style.display = 'grid';
+                document.getElementById(`status-${data.id}`).className = 'file-status transferring';
+                document.getElementById(`status-${data.id}`).textContent = 'Receiving';
+
+                log('receiveLog', `Receiving: ${data.name}`, 'info');
+
+            } else if (data.type === 'chunk') {
+                const transfer = receivedBuffers.get(data.id);
+                if (!transfer) return;
+
+                transfer.chunks[data.index] = data.data;
+                transfer.receivedCount++;
+                transfer.bytesReceived += data.data.byteLength;
+
+                const progress = (transfer.receivedCount / data.total) * 100;
+                updateProgressUI(data.id, progress, transfer.bytesReceived, transfer.metadata.size, true);
+
+                // Send ACK every 10 chunks to prevent congestion
+                if (data.index % 10 === 0 || data.index === data.total - 1) {
+                    connection.send({
+                        type: 'ack',
+                        id: data.id,
+                        index: data.index,
+                        received: transfer.receivedCount
+                    });
+                }
+
+            } else if (data.type === 'complete') {
+                assembleFile(data.id);
+            }
+        }
+
+        function assembleFile(id) {
+            const transfer = receivedBuffers.get(id);
+            if (!transfer) return;
+
+            try {
+                // Verify all chunks received
+                if (transfer.receivedCount !== transfer.metadata.totalChunks) {
+                    throw new Error(`Missing chunks: ${transfer.receivedCount}/${transfer.metadata.totalChunks}`);
+                }
+
+                // Combine chunks
+                const totalSize = transfer.chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0);
+                const combined = new Uint8Array(totalSize);
+                let offset = 0;
+
+                transfer.chunks.forEach(chunk => {
+                    combined.set(new Uint8Array(chunk), offset);
+                    offset += chunk.byteLength;
+                });
+
+                // Create download
+                const blob = new Blob([combined], { type: transfer.metadata.mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = transfer.metadata.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // Update UI
+                document.getElementById(`status-${id}`).className = 'file-status completed';
+                document.getElementById(`status-${id}`).textContent = 'Received ✓';
+                document.getElementById(`progress-detail-${id}`).textContent = 'Complete';
+
+                log('receiveLog', `Received: ${transfer.metadata.name} (${formatBytes(transfer.metadata.size)})`, 'success');
+                showToast(`Received: ${transfer.metadata.name}`, 'success');
+
+                receivedBuffers.delete(id);
+
+                // Clear Electron progress bar
+                if (window.electronAPI) {
+                    window.electronAPI.setProgress(-1);
+                }
+
+            } catch (err) {
+                log('receiveLog', `Error assembling file: ${err.message}`, 'error');
+                document.getElementById(`status-${id}`).className = 'file-status error';
+                document.getElementById(`status-${id}`).textContent = 'Error';
+            }
+        }
+
+        function handleSenderAck(data) {
+            // Handle acknowledgments if needed for reliability
+        }
+
+        // Real-time Stats & UI Updates
+        function updateProgressUI(id, percent, bytes, total, isReceive = false) {
+            const progressEl = document.getElementById(`progress-${id}`);
+            const textEl = document.getElementById(`progress-text-${id}`);
+            const detailEl = document.getElementById(`progress-detail-${id}`);
+            const transferredEl = document.getElementById(`transferred-${id}`);
+            const speedEl = document.getElementById(`speed-${id}`);
+            const etaEl = document.getElementById(`eta-${id}`);
+
+            if (progressEl) progressEl.style.width = percent + '%';
+            if (textEl) textEl.textContent = Math.round(percent) + '%';
+            if (transferredEl) transferredEl.textContent = `${formatBytes(bytes)} / ${formatBytes(total)}`;
+
+            // Calculate speed and ETA
+            const transfer = isReceive ? receivedBuffers.get(id) : activeTransfers.get(id);
+            if (transfer) {
+                const now = Date.now();
+                const elapsed = (now - transfer.startTime) / 1000;
+                const speed = bytes / elapsed; // bytes per second
+
+                if (speedEl) speedEl.textContent = formatSpeed(speed);
+
+                const remaining = total - bytes;
+                const eta = speed > 0 ? remaining / speed : 0;
+                if (etaEl) etaEl.textContent = formatTime(eta);
+
+                if (detailEl) detailEl.textContent = `${formatSpeed(speed)} • ${formatTime(eta)} remaining`;
+
+                // Update Electron progress bar
+                if (window.electronAPI) {
+                    window.electronAPI.setProgress(percent / 100);
+                }
+
+                // Update speed history for graph
+                if (!transfer.speedHistory) transfer.speedHistory = [];
+                transfer.speedHistory.push({ time: now, speed: speed });
+                if (transfer.speedHistory.length > 20) transfer.speedHistory.shift();
+            }
+        }
+
+        function startStatsTracking() {
+            if (statsInterval) clearInterval(statsInterval);
+            statsInterval = setInterval(() => {
+                // Keep connection alive and update any ongoing calculations
+                if (!connection || !connection.open) {
+                    stopStatsTracking();
+                }
+            }, 1000);
+        }
+
+        function stopStatsTracking() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        // Utilities
+        function getFileIcon(type) {
+            if (!type) return '📎';
+            if (type.startsWith('image/')) return '🖼️';
+            if (type.startsWith('video/')) return '🎬';
+            if (type.startsWith('audio/')) return '🎵';
+            if (type.includes('pdf')) return '📄';
+            if (type.includes('zip') || type.includes('rar') || type.includes('7z')) return '📦';
+            if (type.includes('json') || type.includes('javascript') || type.includes('html')) return '💻';
+            return '📎';
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function formatSpeed(bytesPerSec) {
+            return formatBytes(bytesPerSec) + '/s';
+        }
+
+        function formatTime(seconds) {
+            if (!isFinite(seconds) || seconds < 0) return '--:--';
+            if (seconds < 60) return Math.round(seconds) + 's';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.round(seconds % 60);
+            return `${mins}m ${secs}s`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateStatus(elementId, type, message) {
+            const el = document.getElementById(elementId);
+            el.className = 'status-indicator ' + type;
+            el.innerHTML = type === 'connecting' ?
+                `<span class="spinner"></span><span>${message}</span>` :
+                `<span>${message}</span>`;
+        }
+
+        function log(containerId, message, type) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : 'ℹ';
+
+            entry.innerHTML = `<span class="log-time">${time}</span> <span>${icon} ${message}</span>`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Transfer Statistics
+        let totalFilesSent = 0;
+        let totalBytesSent = 0;
+
+        function updateTransferStats(bytes, fileName) {
+            totalFilesSent++;
+            totalBytesSent += bytes;
+
+            const statsEl = document.getElementById('transferStats');
+            if (statsEl) {
+                statsEl.classList.remove('hidden');
+                document.getElementById('filesSent').textContent = totalFilesSent;
+                document.getElementById('totalSent').textContent = formatBytes(totalBytesSent);
+            }
+
+            // Update history list
+            const historyEl = document.getElementById('transferHistory');
+            const historyList = document.getElementById('historyList');
+            if (historyEl && historyList) {
+                historyEl.classList.remove('hidden');
+                const item = document.createElement('div');
+                item.style.fontSize = '0.75rem';
+                item.style.color = 'var(--text-primary)';
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.padding = '0.4rem';
+                item.style.background = 'rgba(255,255,255,0.03)';
+                item.style.borderRadius = '6px';
+                item.style.marginBottom = '0.3rem';
+
+                item.innerHTML = `
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">${fileName}</span>
+                    <span style="color: var(--success);">${formatBytes(bytes)}</span>
+                `;
+
+                historyList.insertBefore(item, historyList.firstChild);
+            }
+        }
+
+        function copyCode() {
+            const code = document.getElementById('peerIdDisplay').textContent;
+            copyToClipboard(code, 'Code copied to clipboard!');
+        }
+
+        function copyLink() {
+            const link = document.getElementById('shareLink').value;
+            copyToClipboard(link, 'Link copied to clipboard!');
+        }
+
+        function copyToClipboard(text, message) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(message, 'success');
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast(message, 'success');
+            });
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Cleanup
+        window.addEventListener('beforeunload', () => {
+            if (peer) peer.destroy();
+            stopStatsTracking();
+        });
+
+        // Visibility API - pause/resume handling
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Page hidden - could pause heavy operations
+            } else {
+                // Page visible - resume
+                if (connection && !connection.open && peer) {
+                    peer.reconnect();
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
